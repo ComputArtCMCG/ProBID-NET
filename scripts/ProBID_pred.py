@@ -88,7 +88,7 @@ def make_prediction(model, fhdf5 ,outpath):
 
 
 if __name__=='__main__':
-    des='########################### Perform prediction ####################################'
+    des='Perform prediction'
     parser = argparse.ArgumentParser(description=des, formatter_class=RawTextHelpFormatter)
     parser.add_argument('-predict', action="store", dest="predict_pdbs", required=True,help="predict mode,input list of pdbid")
     parser.add_argument('-model', action="append", dest="model",required=True,help="0 means picking domain-added model,1-5 means fold model")
