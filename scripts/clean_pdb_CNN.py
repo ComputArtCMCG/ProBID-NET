@@ -1,25 +1,10 @@
-#!/export/apps/bin/python
+#!/usr/bin/env python
 import sys
 import math
 import string
 import numpy as np
 import os
-import h5py
-from Bio import pairwise2 
-import copy
-import itertools
 CUTOFF = 25
-
-def identity(s1, s2):
-    a = pairwise2.align.globalxx(s1, s2, one_alignment_only=True) 
-    count = 0
-    for i in range(len(a[0][0])):
-        if a[0][0][i] != "-" and a[0][1][i] != "-" and a[0][0][i] == a[0][1][i]:
-            count += 1
-    if len(a[0][0]) < len(a[0][1]):
-        return float(count)/len(a[0][0])
-    else:
-        return float(count)/len(a[0][1])
 
 def torsion_angle(i, j, k, l):
     RADIAN = 57.295776
@@ -91,18 +76,6 @@ def get_rotatematrix(axis, origin, angle):
     rot_matrix = np.array(rot_matrix)
     return rot_matrix
 
-def angle(i, j, k):
-    i = np.array(i)
-    j = np.array(j)
-    k = np.array(k)
-    RADIAN = 57.295776
-    dij = i - j
-    dkj = k - j
-    d1 = np.sqrt(np.sum(dij*dij))
-    d2 = np.sqrt(np.sum(dkj*dkj))
-    dotcos = np.sum(dij*dkj)/(d1*d2)
-    return math.acos(dotcos) * RADIAN
-
 def diss(cor1, cor2):
         dis = (cor1[0]-cor2[0])*(cor1[0]-cor2[0]);
         dis = dis+(cor1[1]-cor2[1])*(cor1[1]-cor2[1]);
@@ -167,20 +140,25 @@ def three2one(resname):
             aa = "X"
         return aa
 
-def one2three(resname):
-    aaname = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
+
+aaname_global = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
         'HIS':'H','ILE':'I','LYS':'K','LEU':'L','MET':'M','ASN':'N',
         'PRO':'P','GLN':'Q','ARG':'R','SER':'S','THR':'T','VAL':'V',
         'TRP':'W','TYR':'Y'};
-    bb = {}
-    for i in aaname.keys():
-        bb[aaname[i]] = i
-    try:
-        aa = bb[resname]
-    except:
-        print ("resname %s not recognized, convert to XXX"%resname)
-        aa = "XXX"
-    return aa
+
+def one2three(resname):
+        aaname = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
+        'HIS':'H','ILE':'I','LYS':'K','LEU':'L','MET':'M','ASN':'N',
+        'PRO':'P','GLN':'Q','ARG':'R','SER':'S','THR':'T','VAL':'V',
+        'TRP':'W','TYR':'Y'};
+        bb = {}
+        for i in aaname.keys():
+            bb[aaname[i]] = i
+        try:
+            aa = bb[resname]
+        except:
+            aa = "XXX"
+        return aa
 
 
 class atom:
@@ -196,11 +174,12 @@ class atom:
 	,"SE":78.971,"SM":150.36,"SR":87.62,"TB":158.925,"TE":127.60,"TL":204.38,\
 	"U":238.0289,"V":50.9415,"XE":131.293,"Y":88.90584,"YB":173.045}
 
-    def __init__(self, atomtype, atomid, atomname, resname, chainid, resid,\
+    def __init__(self, atomtype, atomid, atomname_orig, resname, chainid, resid,\
             x=999, y=999, z=999, occu=1, bfactor=0, element="X"):
         self.atomtype = atomtype
         self.atomid = atomid
-        self.atomname = atomname
+        self.atomname_orig = atomname_orig
+        self.atomname = atomname_orig.strip(" ")
         self.resname = resname
         self.chainid = chainid
         self.resid = resid
@@ -234,6 +213,9 @@ class atom:
     
     def get_atomname(self):
         return self.atomname
+
+    def get_atomname_orig(self):
+        return self.atomname_orig
     
     def get_resname(self):
         return self.resname
@@ -257,17 +239,6 @@ class atom:
         self.coor[0] = self.coor[0] + coor[0]
         self.coor[1] = self.coor[1] + coor[1]
         self.coor[2] = self.coor[2] + coor[2]
-
-    def printPDB(self):
-        coor = self.get_coor()
-        print ("ATOM  %5s %-4s %-3s %c%5s   %8.3f%8.3f%8.3f%6.2f%6.2f"%(self.get_atomid(),\
-                self.get_atomname(),self.get_resname(),self.get_chainid(),self.get_resid(),\
-                coor[0],coor[1],coor[2],self.get_occu(),self.get_bfactor()  ))
-    def writePDB(self, fp):
-        coor = self.get_coor()
-        fp.write("ATOM  %5s %-4s %-3s %c%5s   %8.3f%8.3f%8.3f%6.2f%6.2f\n"%(self.get_atomid(),\
-                self.get_atomname(),self.get_resname(),self.get_chainid(),self.get_resid(),\
-                coor[0],coor[1],coor[2],self.get_occu(),self.get_bfactor()  ))
 
 class residue:
         aaname = {'ALA':'A','CYS':'C','ASP':'D','GLU':'E','PHE':'F','GLY':'G',
@@ -312,8 +283,6 @@ class residue:
 
         def get_resname(self):
             return self.resname
-        def get_resid(self):
-            return self.resid
         def get_resname1(self):
             return three2one(self.get_resname)
 
@@ -341,42 +310,6 @@ class residue:
                 if occu < self.minbboccu:
                     self.minbboccu = occu
 
-        def orientCBonZ(self):
-            #move Ca to x,y,z = (0,0,0)
-            #align CB to +Z axis, move N to y=0 plane
-            if self.isorient:
-                self.move_by(self.orient_displace)
-                self.apply_rotmatrix(self.orient_rotatematrix)
-                return self.orient_displace, self.orient_rotatematrix
-
-            cacoor = self.get_coor("CA")
-            self.move_by(-cacoor)
-            
-            cbcoor = self.get_coor("CB")
-            zaxis = np.array([0,0,1])
-            origin = np.zeros(3)
-            initangle = angle(cbcoor, origin, zaxis)
-            anglediff = initangle
-            rotmatrix = get_rotatematrix(np.cross(cbcoor, zaxis), origin, anglediff)
-            self.apply_rotmatrix([rotmatrix])
-            cbcoor = self.get_coor("CB")
-            assert np.fabs(cbcoor[0]) < 1e-4
-            assert np.fabs(cbcoor[1]) < 1e-4
-            ncoor = self.get_coor("N")
-            ncoorOnXY = np.array([ncoor[0], ncoor[1], 0])
-            xaxis_minus = np.array([-1,0,0])
-            initangle = angle(ncoorOnXY, origin, xaxis_minus)
-            anglediff = initangle
-            if ncoorOnXY[1] < 0:
-                anglediff = 360-anglediff
-            rotmatrix1 = get_rotatematrix(zaxis, origin, anglediff)
-            self.apply_rotmatrix([rotmatrix1])
-            ncoor = self.get_coor("N")
-            assert np.fabs(ncoor[1]) < 1e-4
-            assert ncoor[0] < 0
-
-            return -cacoor, [rotmatrix, rotmatrix1]
-
         def orient(self):
             #move Ca to x,y,z = (0,0,0)
             #align N to -x axis, align C to x-y plane and make CB at z > 0
@@ -388,7 +321,7 @@ class residue:
             cacoor = self.get_coor("CA")
             self.move_by(-cacoor)
             ncoor = self.get_coor("N")
-            if ncoor[0] != 0 and ncoor[1] == 0 and ncoor[2] ==0:
+            if ncoor[0] != 0 and ncoor[1] == 0 and ncoor[1] ==0:
                 ncoor[1] = 1e-6
                 ncoor[2] = 1e-6
             ncoor_len = np.sqrt(np.sum(np.dot(ncoor, ncoor)))
@@ -421,6 +354,7 @@ class residue:
                
             rot_matrix = get_rotatematrix(cross, [0,0,0], rotangle)
             self.apply_rotmatrix([rot_matrix])
+
 
             #now put C in the x-y plane
             ccoor = self.get_coor("C")
@@ -473,10 +407,15 @@ class residue:
                     return True
                 else:
                     return False
+        def has_atom(self, atomlist):
+            for a in atomlist:
+                if not a in self.atomnamelist:
+                    return False
+            return True
 
         def has_missingatom(self, bbonly = False):
             if bbonly:
-                if len(self.pdbatoms) > 0 and ("N" in self.pdbatoms or "C" in self.pdbatoms or \
+                if len(self.pdbatoms) > 0 and ("N" in self.pdbatoms and "C" in self.pdbatoms and \
                         "CA" in self.pdbatoms):
                     #print self.pdbatoms, "missing in", self.resname_key
                     return True
@@ -493,43 +432,6 @@ class residue:
                 raise Exception("atom name %s does not exist in residue %s"%(atomname, self.resname_key))
             i = self.atomnamelist.index(atomname)
             return self.atom[i].get_coor()
-        
-        def build_CB(self):
-            for i in range(len(self.atom)):
-                if self.atom[i].get_atomname().replace(" ", "") == "CB":
-                    #print ("CB atom exists in residue %s, skip"%(self.get_resname_key()))
-                    return 0
-            cacoor = self.get_coor("CA")
-            cbatm = copy.deepcopy(self.atom[0])
-            cbatm.atomname = "CB"
-            self.add_atom(cbatm)
-            cbindex = len(self.atom) - 1 
-            self.atom[cbindex].set_coor(cacoor[0], cacoor[1], cacoor[2])
-            self.atom[cbindex].move_by([1.55, 0, 0])
-            cbcoor = self.get_coor("CB")
-            ccoor = self.get_coor("C")
-            axisnorm = np.cross(ccoor-cacoor, cbcoor-cacoor)
-            if np.max(np.fabs(axisnorm)) < 1e-6: #c, ca and cb on a line
-                for i in range(len(self.atom)):
-                    if self.atom[i].get_atomname().replace(" ", "") == "C":
-                        self.atom[i].move_by([0.001, 0.001, 0.001])
-                        ccoor = self.get_coor("C")
-            initangle = angle(ccoor, cacoor, cbcoor)
-            anglediff = 110.5 - initangle
-            axisnorm = np.cross(ccoor-cacoor, cbcoor-cacoor)
-            rotmatrix = get_rotatematrix(axisnorm, cacoor, anglediff)
-            self.atom[cbindex].rotate_by(rotmatrix)
-
-            ncoor = self.get_coor("N")
-            cbcoor = self.get_coor("CB")
-            initdihe = torsion_angle(ncoor, ccoor, cacoor, cbcoor)
-            anglediff = 122.55 - initdihe
-            rotmatrix = get_rotatematrix(cacoor-ccoor, ccoor, anglediff)
-            self.atom[cbindex].rotate_by(rotmatrix)
-            cbcoor = self.get_coor("CB")
-            assert np.fabs(angle(ccoor, cacoor, cbcoor) - 110.5) < 0.01
-            assert np.fabs(torsion_angle(ncoor, ccoor, cacoor, cbcoor) - 122.55) < 0.01
-            assert np.fabs(diss(cacoor, cbcoor) - 1.55 ) < 0.01
 
         def set_neib_res(self, res, tag="prev"):
             if tag == "prev":
@@ -542,45 +444,6 @@ class residue:
         def get_chainid(self):
             return self.atom[0].get_chainid()
 
-        def calc_phipsi(self):
-                #phi C(i-1)-N-CA-C
-                #psi N-CA-C-N(i+1)
-            if self.prev_res == None:
-                self.phi = 999
-            elif self.moltype != "prot" or self.prev_res.moltype != "prot":
-                self.phi = 999
-            else:
-                try:
-                    ci1coor = self.prev_res.get_coor("C")
-                    ncoor = self.get_coor("N")
-                    cacoor = self.get_coor("CA")
-                    ccoor = self.get_coor("C")
-                    dis = diss(ci1coor, ncoor)
-                    if dis > 2:
-                        self.phi = 999
-                    else:
-                    	self.phi = torsion_angle(ci1coor, ncoor, cacoor, ccoor)
-                except:
-                    self.phi = 999
-
-            if self.next_res == None:
-                self.psi = 999
-            elif self.moltype != "prot" or self.next_res.moltype != "prot":
-                self.psi = 999
-            else:
-                try:
-                    ncoor = self.get_coor("N")
-                    cacoor = self.get_coor("CA")
-                    ccoor = self.get_coor("C")
-                    n1coor = self.next_res.get_coor("N")
-                    dis = diss(ccoor, n1coor)
-                    if dis > 2:
-                        self.psi = 999
-                    else:
-                        self.psi = torsion_angle(ncoor, cacoor, ccoor, n1coor)
-                except:
-                    self.psi = 999
-
         def get_dihedral(self, typee):
             if typee == "phi":
                 return self.phi
@@ -590,25 +453,6 @@ class residue:
                 return self.omega
             else:
                 raise Exception("unknown dihedral type %s"%typee)
-
-        def calc_omega(self):
-            if self.prev_res == None:
-                self.omega = 999
-            elif self.moltype != "prot" or self.prev_res.moltype != "prot":
-                self.omega = 999
-            else:
-                try:
-                    ci1coor = self.prev_res.get_coor("CA")
-                    c1coor = self.prev_res.get_coor("C")
-                    ncoor = self.get_coor("N")
-                    cacoor = self.get_coor("CA")
-                    dis = diss(c1coor, ncoor)
-                    if dis > 2:
-                        self.omega = 999
-                    else:
-                        self.omega = torsion_angle(ci1coor, c1coor, ncoor, cacoor)
-                except:
-                    self.omega = 999
 
         def get_resname_key(self):
             return self.resname_key
@@ -622,32 +466,11 @@ class residue:
         def get_chi(self):
             return self.chi
 
-        def calc_chi(self):
-                self.chi = []
-                if not self.resname in topology.sidechain:
-                    sdatom = []
-                else:
-                    sdatom = topology.sidechain[self.resname]
-                self.nchi = len(sdatom)
-                if self.nchi == 0:
-                    self.chi = [999]
-                for i in range(0, self.nchi):
-                    try:
-                        c1 = self.get_coor(sdatom[i][0])
-                        c2 = self.get_coor(sdatom[i][1])
-                        c3 = self.get_coor(sdatom[i][2])
-                        c4 = self.get_coor(sdatom[i][3])
-                        self.chi.append(torsion_angle(c1, c2, c3, c4))
-                    except:
-                        print ("chi %s does not exist in %s"%("-".join(sdatom[i]), self.resname_key))
-                        self.chi.append(999)
                
         def iscontact(self, res2, cutoff = 4.5):
                 for at1 in self.atom:
                     cor1 = at1.get_coor()
                     for at2 in res2.atom:
-                            if not at2.get_atomname().replace(" ", "") in ["N", "CA", "CB", "C", "O"]:
-                                continue
                             cor2 = at2.get_coor()
                             dis = (cor1[0]-cor2[0])*(cor1[0]-cor2[0])
                             dis = dis+(cor1[1]-cor2[1])*(cor1[1]-cor2[1])
@@ -676,19 +499,11 @@ class residue:
 #  77 - 78        LString(2)    element      Element symbol, right-justified.
 #  79 - 80        LString(2)    charge       Charge  on the atom.
                 
-        def printPDB(self):
-            for i in range(0,self.atomnum):
-                coor = self.atom[i].get_coor()
-                print ("ATOM  %5d %-4s %-3s %c%5s   %8.3f%8.3f%8.3f%6.2f%6.2f"%(self.atom[i].get_atomid(),\
-                        self.atom[i].get_atomname(),self.resname,self.chainid,self.resid,\
-                        coor[0],coor[1],coor[2],self.atom[i].get_occu(),self.atom[i].get_bfactor()))
         def writePDB(self, fp):
             for i in range(0,self.atomnum):
-                if not self.atom[i].get_atomname() in ["N", "CA", "C", "CB", "O"]:
-                    continue
                 coor = self.atom[i].get_coor()
                 fp.write("ATOM  %5d %-4s %-3s %c%5s   %8.3f%8.3f%8.3f%6.2f%6.2f\n"%(self.atom[i].get_atomid(),\
-                        self.atom[i].get_atomname(),self.resname,self.chainid,self.resid,\
+                        self.atom[i].get_atomname_orig(),self.resname,self.chainid,self.resid,\
                         coor[0],coor[1],coor[2],self.atom[i].get_occu(),self.atom[i].get_bfactor()))
 
 class protein:
@@ -702,19 +517,21 @@ class protein:
                 self.pdbfile = pdbfile
 
         def readPDB(self,pdbfile ="", resname4=False):
-                fin = open(pdbfile.strip(), 'r')
+                fin = open(pdbfile, 'r')
                 resid_prev = "null"
                 chain_prev = "null"
                 residueAltKey = {}
+                nmodel = 0
                 for line in fin.readlines():
                         line = line.strip('\n')
                         linee = line.split()
                         if len(linee) == 0:
                             continue
-                        if linee[0] == "MODEL" and linee[1] == "2":
-                            break
-                        if linee[0] == "SEQRES":
-                            continue
+                        if len(linee) >= 2 and linee[0] == "MODEL" and linee[1].isdigit():
+                            nmodel += 1
+                            if nmodel >= 2:
+                                break
+                        if linee[0] == "SEQRES" and len(linee) >= 3:
                             #SEQRES  10 A  245  THR LYS ASN ILE VAL TYR PRO PHE ASP GLN TYR ILE ALA          
                             chain = linee[2]
                             seq = linee[4:]
@@ -722,19 +539,20 @@ class protein:
                                 self.seqres[chain] = []
                             self.seqres[chain].extend(seq)
 
-                        if line[0:4] == "ATOM" or line[0:6] == "HETATM":
-                                if len(line) >=  78 and line[77] == "H":
-                                    continue
+                        if len(line) >= 6 and (line[0:4] == "ATOM" or line[0:6] == "HETATM"):
+                                ptype = line[0:4]
+                                #if len(line) >=  78 and line[77] == "H":
+                                #    continue
                                 if resname4 == False:
                                     pdb_resname = line[17:20]
                                 else:
                                     pdb_resname = line[17:21]
                                 if pdb_resname.replace(" ","") == "HOH":
                                     continue
-                                if line[0:6] == "HETATM" and pdb_resname != "MSE":
-                                    continue
                                 pdb_resid = line[22:27]
                                 pdb_chain = line[21]
+                                if pdb_chain == " ":
+                                    pdb_chain = "A"
                                 pdb_coorx = float(line[30:38])
                                 pdb_coory = float(line[38:46])
                                 pdb_coorz = float(line[46:54])
@@ -742,31 +560,40 @@ class protein:
                                     pdb_Bfactor = float(line[60:66])
                                 except:
                                     pdb_Bfactor = 0
-
-                                pdb_occu = float(line[54:60])
-                                pdb_atomname = line[11:16]
-                                pdb_atomname = pdb_atomname.strip(" ")
+                                try:
+                                    pdb_occu = float(line[54:60])
+                                except:
+                                    pdb_occu = 1.0
+                                pdb_atomname_orig = line[12:16]
+                                pdb_atomname = pdb_atomname_orig.strip(" ")
+                                if pdb_atomname == "OT1":
+                                    pdb_atomname = "O"
+                                    pdb_atomname_orig = "O"
+                                if pdb_atomname[0] == "H":
+                                    continue
                                 if pdb_resname == "ILE" and pdb_atomname == "CD":
                                     pdb_atomname = "CD1"
+                                    pdb_atomname_orig = " CD1"
                                 pdb_atomid = int(line[6:11])
-                                pdb_element = line[76:78].replace(" ","")
+                                #pdb_element = line[76:78].replace(" ","")
+                                pdb_element = pdb_atomname[0]
                                 if pdb_resname == "MSE" and pdb_atomname == "SE":
                                     pdb_atomname = "SD"
+                                    pdb_atomname_orig = " SD "
                                     pdb_element = "S"
                                 if pdb_resname == "MSE":
+                                    ptype = "ATOM"
                                     pdb_resname = "MET"
 
-                                #occu not 1
                                 alt = line[16]
-                                if not alt in ["A", " "]:
+                                if not (alt == " " or alt == "A"):
                                     continue
-                                #tag = pdb_resid + "-" + pdb_chain
-                                #if not tag in residueAltKey:
-                                #    residueAltKey[tag] = alt
-                                #if alt != residueAltKey[tag]:
-                                #    continue
+                                if ptype == "HETA":
+                                    continue
+                                if not pdb_resname.replace(" ", "") in aaname_global:
+                                    continue
                     
-                                atm = atom(linee[0], pdb_atomid, pdb_atomname, pdb_resname, \
+                                atm = atom(linee[0], pdb_atomid, pdb_atomname_orig, pdb_resname, \
                                         pdb_chain, pdb_resid, pdb_coorx, pdb_coory, pdb_coorz, pdb_occu, pdb_Bfactor, pdb_element)
                                 self.atomlist.append(atm)
                 fin.close()
@@ -775,32 +602,6 @@ class protein:
                 self.build_chain()
 
         def build_chain(self):
-            self.seqres1 = {}
-            for r in self.residuelist:
-                chain = r.chainid
-                seq = r.resname
-                if not chain in self.seqres:
-                    self.seqres[chain] = []
-                if not chain in self.seqres1:
-                    self.seqres1[chain] = ""
-                self.seqres[chain].append(seq)
-                self.seqres1[chain] += three2one(seq)
-            #group uniq chains into groups
-            self.chain_groups = []
-            for chainid in self.seqres:
-                seq = self.seqres1[chainid]
-                tag = False
-                for i in range(0, len(self.chain_groups)):
-                    for ch in self.chain_groups[i]:
-                        if identity(seq, self.seqres1[ch]) > 0.95:
-                            self.chain_groups[i].append(chainid)
-                            tag = True
-                            break
-                if tag == False:
-                    self.chain_groups.append([chainid])
- 
-
-        def build_chain_old(self):
             if len(self.seqres.keys()) == 0:
                 for i in range(self.residuenum):
                     ch = self.residuelist[i].get_chainid()
@@ -888,28 +689,6 @@ class protein:
                         self.residuelist[i].set_neib_res(self.residuelist[i+1], "next")
             self.residuenum = len(self.residuelist)
 
-        def load_sasa(self, sasafile):
-            self.load_naccess(sasafile, 'ABS')
-
-        def load_freesasa(self, sasfile):
-            #load SAS results from freeSASA program
-            for line in open(sasfile, "r").readlines():
-                line = line.strip("\n")
-                linee = line.split()
-                if len(linee) > 0 and linee[0] == "SEQ":
-                    chainid = linee[1]
-                    resid = linee[2]
-                    resname = linee[3]
-                    sas = float(linee[5]) 
-                    try:
-                        index = self.get_residueindex(resname, resid, chainid)
-                        self.residuelist[index].set_sasa(sas)
-                    except:
-                        raise Exception("error in load_sasa from file %s, no match for residue %s %s %s"%(sasfile, resname, resid, chainid))
-
-            for i in range(0, len(self.residuelist)):
-                if self.residuelist[i].get_sasa() < 0 and self.residuelist[i].moltype == "prot":
-                    raise Exception("residue %s doe not have SASA value"%self.residuelist[i].get_resname_key())
 
         def get_residueindex(self, resname, resid, chainid):
             resname_key = self.residuelist[0].make_reskey(resname, resid, chainid)
@@ -918,19 +697,15 @@ class protein:
             else:
                 return self.residuemap[resname_key]
 
-        def printPDB(self, resid="null"):
-                if resid=="null":
-                    for i in self.residuelist:
-                            i.printPDB()
-                else:
-                    self.residuelist[resid].printPDB()
-
         def writePDB(self, filename, list=[]):
                 fp = open(filename, 'w');
                 if len(list)==0:
                         list = range(0,self.residuenum)
                 for i in list:
-                    self.residuelist[i].writePDB(fp);
+                    if self.residuelist[i].has_atom(["CA", "C", "N", "O"]) == True:
+                        self.residuelist[i].writePDB(fp)
+                    else:
+                        print (self.pdbfile, "residue %s has missing backbone atoms, skip"%self.residuelist[i].resname_key)
                 fp.close();
 
         def get_fasta(self):
@@ -939,287 +714,10 @@ class protein:
                         seq = seq + i.resname1
                 return seq
 
-        def load_dssp(self, dsspfile):
-                fp = open(dsspfile, "r");
-                nload = 0;
-                for line in fp.readlines():
-                    line = line.strip("\n")
-                    if line[-1] == ".":
-                            continue
-                    if line.find("#") > 0:
-                            continue;
-                    if line[13] == "!":
-                        continue
-#  165  184AB G  S    S-     0   0    5    -23,-1.7     2,-0.4    -2,-0.4     7,-0.1  -0.983  83.4 -45.3 143.5-149.2   27.0   36.2   16.2
-
-                    linee = line.split()
-                    resid = line[5:11].replace(" ","")
-                    chainid = line[11]
-                    resname1 = line[13]
-                    #The one letter code for the amino acid. If this letter is lower\
-                    # case this means this is a cysteine that form a sulfur bridge with\
-                    # the other amino acid in this column with the same lower case letter.
-                    if resname1.islower():
-                        resname1 = "C"
-                    dsspcode = line[16]
-                    if dsspcode == " ":
-                            dsspcode = "space"
-                    resname3 = one2three(resname1)
-                    try:
-                        index = self.get_residueindex(resname3, resid, chainid)
-                        self.residuelist[index].set_dssp(dsspcode)
-                    except:
-                        if resname1 == "C":
-                            try:
-                                index = self.get_residueindex("CSS", resid, chainid)
-                                self.residuelist[index].set_dssp(dsspcode)
-                            except:
-                                print ("%s %s %s %s in dssp file but not find in residuelist dssp"%(self.pdbfile, resname3, resid, chainid))
-                        else:
-                            #raise Exception("%s %s %s not find in setting dssp"%(resname3, resid, chainid) )
-                            print ("%s %s %s %s in dssp file but not find in residuelist dssp"%(self.pdbfile, resname3, resid, chainid))
-
-                for i in range(0, len(self.residuelist)):
-                    if self.residuelist[i].get_dssp() == "none" and \
-                            self.residuelist[i].moltype == "prot" and \
-                            self.residuelist[i].has_missingatom() == False:
-                        print ("#warning missing dssp info for %s"%self.residuelist[i].get_resname_key())
-        def load_naccess(self, naccessfile, type = "REL"):
-#REM                ABS   REL    ABS   REL    ABS   REL    ABS   REL    ABS   REL
-#RES ILE A  22    84.27  48.1  22.86  16.6  61.40 165.2  25.14  18.1  59.12 164.3
-#RES ASP A  23    79.52  56.6  71.04  69.2   8.47  22.5  42.51  86.3  37.00  40.6
-#RES GLU A  24    97.06  56.3  91.16  67.7   5.90  15.7  54.76  90.8  42.30  37.8
-#RES ASN A  25    49.23  34.2  44.20  41.6   5.03  13.3  27.65  59.8  21.58  22.1
-
-                fp = open(naccessfile, "r")
-                for line in fp.readlines():
-                        line = line.strip("\n")
-                        linee = line.split()
-                        if linee[0] != "RES":
-                                continue;
-                        resname3 = linee[1]
-                        chainid = line[8]
-                        resid = line[9:14].replace(" ","")
-                        if type == "REL":
-                            sas = float(line[22:28].replace(" ",""))
-                        else:
-                            sas = float(line[15:22].replace(" ",""))
-                            index = self.get_residueindex(resname3, resid, chainid)
-                        try:
-                            index = self.get_residueindex(resname3, resid, chainid)
-                            self.residuelist[index].set_sasa(sas)
-                        except:
-                            print ("%s %s %s not find in setting Naccess"%(resname3, resid, chainid))
-
-def isinbox(c1, c2, dis):
-    a = np.fabs(c1-c2)
-    if max(a) < dis:
-        return True
-    else:
-        return False
-
-def calc_gauss_density(d1, d2, r):
-    dis = diss(d1, d2)
-    return np.exp(-dis**2/(2*r**2))
-    return np.exp(-dis**2/(2*r**2))/np.sqrt(2*np.pi)/r
-
-def write_dx(data3d, boxsize, gridsize, output):
-    assert len(boxsize) == 3
-    origin = [-i/2.0 for i in boxsize]
-    ngrid = [int(i/gridsize) for i in boxsize]
-    fp = open(output, "w")
-    fp.write("object 1 class gridpositions counts %d %d %d\n"%(ngrid[0], ngrid[1], ngrid[2]))
-    fp.write("origin %f %f %f\n"%(origin[0], origin[1], origin[2]))
-    fp.write("delta %f %f %f\ndelta %f %f %f\ndelta %f %f %f\n"%(gridsize,0,0, 0,gridsize,0, 0,0,gridsize))
-    fp.write("object 2 class gridconnections counts %d %d %d\n"%(ngrid[0], ngrid[1], ngrid[2]))
-    fp.write("object 3 class array type double rank 0 items %d data follows\n"%(ngrid[0]*ngrid[1]*ngrid[2]))
-    count = 0
-    for i in range(0, ngrid[0]):
-        for j in range(0, ngrid[1]):
-            for k in range(0, ngrid[2]):
-                pot = data3d[i][j][k]
-                fp.write("%f  "%pot)
-                count = count + 1
-                if count % 3 == 0:
-                    fp.write("\n")
-                    count = 0
-    if count != 0:
-        fp.write("\n")
-    fp.write("object 4 class field\n")
-    fp.close()
-    print ("3D grid written to %s"%output)
-    #fp.write("component \"positions\" value 1\n")
-    #fp.write("component \"connections\" value 2\n")
-    #fp.write("component \"data\" value 3\n")
-
-def calc_CNNfeature(prot, reslist, boxsize, binsize, boxcenter, atomr_dict, atom_channel_dict):
-    natomtype = len(set(list(atom_channel_dict.values())))
-    grid = np.arange(-boxsize/2, boxsize/2+binsize, binsize)
-    grid1 = np.arange(-boxsize/2-binsize, boxsize/2+2*binsize, binsize)
-    gridcenter = [grid[i]*0.5+grid[i+1]*0.5 for i in range(len(grid)-1)]
-    gridsize = len(gridcenter)
-    neibgrid = list(itertools.product([-1, 0, 1], repeat=3))
-    neibgrid = np.array(neibgrid)
-
-    rescenter = prot.residuelist[reslist[0]].get_resname_key()
-    data = np.zeros((gridsize, gridsize, gridsize, natomtype), dtype=np.float32)
-    #print (prot.residuelist[reslist[0]].get_resname_key(), len(reslist))
-    
-    tag = 0
-    for i in reslist:
-        r = prot.residuelist[i]
-        r.move_by(-boxcenter)
-        for atm in r.atom:
-            if tag == 0:
-                resname = "CEN"
-            else:
-                resname = atm.resname
-            atomname = atm.atomname
-            key = (resname, atomname)
-            if not key in atom_channel_dict:
-                #print (key, "not in atom_channel_dict, skip in calc CNN density")
-                continue
-            coor = atm.coor[0:3]
-            if np.max(np.fabs(coor)) > boxsize/2.0 + 2*binsize:
-                continue
-            ind = np.array([np.searchsorted(grid1, c)-2 for c in coor])
-            neibgridid = neibgrid + ind
-            for neibid in neibgridid:
-                if min(neibid) < 0 or max(neibid) > gridsize-1:
-                    continue
-                gridc = [gridcenter[neibid[0]], gridcenter[neibid[1]], gridcenter[neibid[2]]]
-                density = calc_gauss_density(coor, gridc, atomr_dict[key])
-                #print (coor, neibid, density, gridc) 
-                data[neibid[0]][neibid[1]][neibid[2]][atom_channel_dict[key]-1] += density
-        tag += 1
-
-    return data
-
-restypedict = {'ALA':1,'CYS':2,'ASP':3,'GLU':4,'PHE':5,'GLY':6,
-        'HIS':7,'ILE':8,'LYS':9,'LEU':10,'MET':11,'ASN':12,
-        'PRO':13,'GLN':14,'ARG':15,'SER':16,'THR':17,'VAL':18,
-        'TRP':19,'TYR':20};
-def get_restypeid(resname):
-    if len(resname) == 1:
-        resname = one2three(resname)
-    id= restypedict[resname]-1
-    return id
-
-def get_cnndata(fpdb, wtreslist, boxsize, binsize, boxcenterZ, atomr_dict, atom_channel_dict):
-    debug = False
-    boxr = math.sqrt(3) * boxsize/2.0
-
-    boxcenter = np.array([0,0,boxcenterZ])
-    prot = protein(fpdb)
-    dismatrix = np.zeros((len(prot.residuelist), len(prot.residuelist)), dtype=np.float)
-    for i in range(0, len(prot.residuelist)):
-        prot.residuelist[i].backup_coor()
-        cacoor1 = prot.residuelist[i].get_coor("CA")
-        for j in range(i+1, len(prot.residuelist)):
-            cacoor2 = prot.residuelist[j].get_coor("CA")
-            dis = diss(cacoor1, cacoor2)
-            dismatrix[i,j] = dis
-            dismatrix[j,i] = dis
-    #select interface residue from all XXX residues
-    resindex = []
-    for i in range(len(prot.residuelist)):
-        if prot.residuelist[i].resname != "XXX":
-            continue
-        tag = False
-        for j in range(len(prot.residuelist)):
-            if prot.residuelist[j].resname == "XXX":
-                continue
-            if dismatrix[i, j] > 25:
-                continue
-            tag, dis = prot.residuelist[j].iscontact(prot.residuelist[i], 6)
-            if tag:
-                break
-        if tag:
-            resindex.append(i)
-    #print (resindex)
-    #sel=[]
-    #for i in resindex:
-    #    print (wtreslist[i])
-    #    sel.append(wtreslist[i][1])
-    #print ("+".join(sel))
-
-    dataall = []
-    reskeys = []
-    for i in resindex: ######################
-        reslist = []
-        displace, rot_matrix = prot.residuelist[i].orientCBonZ()
-        cacoor = prot.residuelist[i].get_coor("CA")
-        reslist.append(i)
-        for j in range(0, len(prot.residuelist)):
-            if j == i:
-                continue
-            if dismatrix[i][j] > boxr + 8:
-                continue
-            prot.residuelist[j].move_by(displace)
-            prot.residuelist[j].apply_rotmatrix(rot_matrix)
-            reslist.append(j)
-        reskey = "_".join(wtreslist[i])
-        output = fpdb+".%s"%reskey
-        data = calc_CNNfeature(prot, reslist, boxsize, binsize, boxcenter, atomr_dict, atom_channel_dict)
-        dataall.append(data)
-        reskeys.append(reskey)
-        print (reskey, data.shape)
-        print ("atom density matrix", np.mean(data[:,:,:,0:-1]), np.max(data[:,:,:,0:-1]), np.min(data[:,:,:,0:-1]))
-        if debug:
-            prot.writePDB(output+".pdb", reslist)
-            """
-            for j in range(0, data.shape[-1]-1):
-                write_dx(data[:,:,:,j], [boxsize, boxsize, boxsize], binsize, 
-                        fpdb+".%s.ch%d.dx"%(reskey, j))
-            write_dx(data[:,:,:,-1], [boxsize, boxsize, boxsize], binsize, 
-                        fpdb+".%s.apbs.dx"%reskey)"""
-        for j in reslist:
-            prot.residuelist[j].recover_coor()
-    return dataall, reskeys
-
-def get_reslist(f):
-    prot = protein(f)
-    reslist = []
-    for r in prot.residuelist:
-        if three2one(r.get_resname()) == "X":
-            continue
-        reslist.append((r.get_resname(), r.get_resid().replace(" ", ""), r.get_chainid()))
-    return reslist
-
-def get_atomr(fatomr):
-    atomr_dict = {}
-    atom_channel_dict = {}
-    for line in open(fatomr):
-        line = line.split()
-        key = (line[0], line[1])
-        rmin = float(line[3])
-        index = int(line[4])
-        atomr_dict[key] = np.sqrt(-rmin**2/np.log(0.05)/2)
-        atom_channel_dict[key] = index
-    return atomr_dict, atom_channel_dict
-
 if __name__ == "__main__":
-    if len(sys.argv) != 7:
-        print (sys.argv[0], "fpdborig fpdb boxsize binsize boxcenterZ fatomr")
-        sys.exit()
-    fpdborig, fpdb, boxsize, binsize, boxcenterZ, fatomr = sys.argv[1:]
-    atomr_dict, atom_channel_dict = get_atomr(fatomr)
-    print (atomr_dict)
-    print (atom_channel_dict)
-    boxsize = float(boxsize)
-    binsize = float(binsize)
-    boxcenterZ = float(boxcenterZ)
-    wtreslist = get_reslist(fpdborig) ###
-    print (fpdborig, wtreslist)
-    dataall = []
-    reskeyall = []
-    
-    data, reskey = get_cnndata(fpdb, wtreslist, boxsize, binsize, boxcenterZ, atomr_dict, atom_channel_dict)
-    dataall.extend(data)
-    reskeyall.extend(reskey)
+    pdbfile = sys.argv[1]
+    output = sys.argv[2]
+    prot = protein(pdbfile)
+    prot.writePDB(output)
 
-    f = h5py.File(fpdb + ".hdf5", "w")
-    for i in zip(reskeyall, dataall):
-        f.create_dataset(i[0], data=i[1], compression="lzf")
-    f.close()
-    print ("saved %d residue data to %s"%(len(data), fpdb+".hdf5"))
+
