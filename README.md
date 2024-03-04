@@ -1,3 +1,7 @@
+The checkpoint of model trained on both Chain-chain interface and domain-domain interface sets is available at https://figshare.com/s/ebbd5184c0a46fb2b179; DOI 10.6084/m9.figshare.25333570.
+
+After downloading the checkpoint, you can run ProBID-Net by following the steps:
+
 1. Create conda environment and install keras
 conda env create -n ProBID -f environment.yaml
 
