@@ -1,4 +1,5 @@
 The checkpoint of model trained on both Chain-chain interface and domain-domain interface sets is available at https://figshare.com/s/ebbd5184c0a46fb2b179; DOI 10.6084/m9.figshare.25333570.
+
 The lists of protein-protein complex structures for the training set, the added training set, and all three test sets are available in the following files:
 
 'Chain-chain_interface_train_set.txt'
