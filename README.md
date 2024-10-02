@@ -25,8 +25,7 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
 6. Activate the ProBID env if it is not active and make predictions with
   ./ProBID-Net_run.sh [pdblist] [pdbpath]
    where [pdblist] is the file in step 2, and [pdbpath] is the path that all PDB files are stored.
-
-7.You can find a total of six output predictions in the 'output_pred' folder,where 'xxxx.pred_0' is 
+7. You can find a total of six output predictions in the 'output_pred' folder,where 'xxxx.pred_0' is 
   predicted by the model with the domain-domain interface added as the training set.
 
 Example:
