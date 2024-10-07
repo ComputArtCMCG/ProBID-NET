@@ -1,6 +1,6 @@
 The checkpoint of model trained on both Chain-chain interface and domain-domain interface sets is available at https://figshare.com/s/ebbd5184c0a46fb2b179; DOI 10.6084/m9.figshare.25333570.
 
-The lists of protein-protein complex structures for the training set, the added training set, and all three test sets are available in the following files:
+The lists of protein-protein complex structures for the training set, the added training set, and all three test sets are available in 'dataset':
 
 'Chain-chain_interface_train_set.txt'
 'Added_domain-domain_interface_set.txt'
@@ -8,8 +8,8 @@ The lists of protein-protein complex structures for the training set, the added 
 
 After downloading the checkpoint, you can run ProBID-Net by following the steps:
 
-1. Unzip the downloaded file and navigate to the folder
-   unzip ProBID-NET-main.zip
+1. Unzip the downloaded file and navigate to the folder：  
+   unzip ProBID-NET-main.zip  
    cd ./ProBID-NET-main/
 
 2. Create conda environment and install keras with command in 'install':  
@@ -30,7 +30,7 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
   ./ProBID-Net_run.sh [pdblist] [pdbpath]
    where [pdblist] is the file in step 2, and [pdbpath] is the path that all PDB files are stored.
    
-8. You can find a prediction file in the 'example/output_pred/' folder,where 'xxxx.pred_0' is 
+7. You can find a prediction file in the 'example/output_pred/' folder,where 'xxxx.pred_0' is 
    predicted by the model with the domain-domain interface added as the training set.
 
 Example:
