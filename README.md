@@ -12,11 +12,11 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
    unzip ProBID-NET-main.zip
    cd ./ProBID-NET-main/
 
-2. Create conda environment and install keras with command in 'install':
-   conda create -n keras2.8.0 python=3.9
-   conda activate keras2.8.0
-   conda install keras=2.8.0
-   pip install pandas biopython
+2. Create conda environment and install keras with command in 'install':  
+   conda create -n keras2.8.0 python=3.9   
+   conda activate keras2.8.0  
+   conda install keras=2.8.0  
+   pip install pandas biopython  
 
 3. Download the checkpoint of model and save it in the 'models' fold
    
@@ -35,11 +35,11 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
 
 Example:
 In the 'Example' folder, we demonstrate how to predict the amino acids on the interface residues of Chain B in the '1euv.pdb' complex structure.
-First, the '1euv.pdb' file was split into two separate structures: '1euv.pdb.A' and '1euv.pdb.B'. In the '1euv.pdb.B' file, the amino acid types 
+Firstly, the '1euv.pdb' file was split into two separate structures: '1euv.pdb.A' and '1euv.pdb.B'.   In the '1euv.pdb.B' file, the amino acid types 
 at the interface residues of Chain B were masked as 'XXX'.
 Next, the structural information from '1euv.pdb.B' was encoded into an HDF5 file named '1euv.pdb.B.hdf5', which was used as the input for ProBID-Net.
-Run the model:
-   ./ProBID-Net_run.sh examples/1euv.input examples/
+Run the model:  
+   ./ProBID-Net_run.sh examples/1euv.input examples/  
 After running the prediction, the probabilities for each of the 20 natural amino acids were output and saved in the file '1euv.pdb.B.pred'.
 
 If you encounter any issues during installation, please raise a question in the issue section of our repository.
