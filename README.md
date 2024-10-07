@@ -12,13 +12,16 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
    unzip ProBID-NET-main.zip
    cd ./ProBID-NET-main/
 
-2. Create conda environment and install keras
-  conda env create -n ProBID -f environment.yaml
+2. Create conda environment and install keras with command in 'install':
+   conda create -n keras2.8.0 python=3.9
+   conda activate keras2.8.0
+   conda install keras=2.8.0
+   pip install pandas biopython
 
 3. Download the checkpoint of model and save it in the 'models' fold
    
 4. Prepare a list file that contains the prefix of the PDB files of protein-protein complexes and
- the chain to predict separated by '  '(i.e., '1euv.pdb  B' )
+   the chain to predict separated by '  '(i.e., '1euv.pdb  B' )
 
 5. In the ProBID-Net_run.sh script, change 'ProBID_path=./' to either the actual path of the ProBID-Net main folder
    or leave it as the current setting if you are running the script from the ProBID-Net directory
@@ -27,7 +30,7 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
   ./ProBID-Net_run.sh [pdblist] [pdbpath]
    where [pdblist] is the file in step 2, and [pdbpath] is the path that all PDB files are stored.
 7. You can find a total of six output predictions in the 'output_pred' folder,where 'xxxx.pred_0' is 
-  predicted by the model with the domain-domain interface added as the training set.
+   predicted by the model with the domain-domain interface added as the training set.
 
 Example:
 In the 'Example' folder, we demonstrate how to predict the amino acids on the interface residues of Chain B in the '1euv.pdb' complex structure.
