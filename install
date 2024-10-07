@@ -1,0 +1,4 @@
+conda create -n keras2.8.0 python=3.9
+conda activate keras2.8.0
+conda install keras=2.8.0
+pip install pandas biopython
