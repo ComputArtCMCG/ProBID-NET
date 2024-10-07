@@ -38,7 +38,7 @@ In the 'Example' folder, we demonstrate how to predict the amino acids on the in
 First, the '1euv.pdb' file was split into two separate structures: '1euv.pdb.A' and '1euv.pdb.B'. In the '1euv.pdb.B' file, the amino acid types 
 at the interface residues of Chain B were masked as 'XXX'.
 Next, the structural information from '1euv.pdb.B' was encoded into an HDF5 file named '1euv.pdb.B.hdf5', which was used as the input for ProBID-Net.
-Run the model for predicting on the complex:
+Run the model:
    ./ProBID-Net_run.sh examples/1euv.input examples/
 After running the prediction, the probabilities for each of the 20 natural amino acids were output and saved in the file '1euv.pdb.B.pred'.
 
