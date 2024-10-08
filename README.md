@@ -34,13 +34,10 @@ After downloading the checkpoint, you can run ProBID-Net by following the steps:
    predicted by the model with the domain-domain interface added as the training set.
 
 8. Example:  
-Run the model with command:  
+Run the model with the following command:  
    ./ProBID-Net_run.sh examples/1euv.input examples/  
-In the 'Example' folder, we demonstrate how to predict the amino acids on the interface residues of Chain B in the '1euv.pdb' complex structure.
-Firstly, the '1euv.pdb' file was split into two separate structures: '1euv.pdb.A' and '1euv.pdb.B'.   In the '1euv.pdb.B' file, the amino acid types 
-at the interface residues of Chain B were masked as 'XXX'.
-Next, the structural information from '1euv.pdb.B' was encoded into an HDF5 file named '1euv.pdb.B.hdf5', which was used as the input for ProBID-Net.
-After running the prediction, the probabilities for each of the 20 natural amino acids will be saved in the file examples/output_pred/1euv.pdb.B.pred
+In the 'examples' folder, we provide a demonstration of how to predict the amino acids at the interface residues of Chain B in the '1euv.pdb' complex structure. First, the '1euv.pdb' file is split into two separate structures: '1euv.pdb.A' and '1euv.pdb.B'. In the '1euv.pdb.B' file, the amino acid types at the interface residues of Chain B are masked as 'XXX'.
+Next, the structural information from '1euv.pdb.B' is encoded into an HDF5 file named '1euv.pdb.B.hdf5', which serves as the input for ProBID-Net. After running the prediction, the probabilities for each of the 20 natural amino acids will be saved in the file examples/output_pred/1euv.pdb.B.pred.
 
 If you encounter any issues during installation, please raise a question in the issue section of our repository.
 
