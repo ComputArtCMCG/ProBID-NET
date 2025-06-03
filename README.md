@@ -30,7 +30,7 @@ The lists of protein-protein complex structures for the training set and  test s
 
 
 ## Reference
-Zhihang Chen et. al, ProBID-Net: A Deep Learning Model for Protein-Protein Binding Interface Design, *submitted*  
+Chen, Z.;  Ji, M.;  Qian, J.;  Zhang, Z.;  Zhang, X.;  Gao, H.;  Wang, H.;  Wang, R.; Qi, Y., ProBID-Net: a deep learning model for protein–protein binding interface design. Chemical science 2024, 15 (47), 19977-19990 DOI：https://doi.org/10.1039/D4SC02233E 
 
 
    
